@@ -43,11 +43,11 @@ const renderer = new THREE.WebGLRenderer({
   antialias: true,
   powerPreference: 'high-performance'
 });
+
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.shadowMap.autoUpdate = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -67,14 +67,18 @@ const params = {
   textDepth: 35,
 
   lightColor: '#ffb27a',
-  lightIntensity: 3,
+  lightIntensity: 150,
   lightX: 0,
   lightY: 0,
   lightZ: -500,
 
-  sourceColor: '#000000',
-  sourceSize: 350,
-  sourceVisible: false,
+  spotAngle: 28,
+  spotPenumbra: 0.45,
+  spotDistance: 3000,
+  spotDecay: 1,
+
+  shadowMapSize: 2048,
+  shadowBias: -0.0005,
 
   density: 1 / 90,
   maxDensity: 0.75,
@@ -83,50 +87,33 @@ const params = {
   distanceAttenuation: 1.5,
   raymarchSteps: 60,
   blur: true,
-  gammaCorrection: true,
-
-  shadowMapSize: 2048,
-  shadowBias: -0.0005
+  gammaCorrection: true
 };
-
-const light = new THREE.DirectionalLight(
-  params.lightColor,
-  params.lightIntensity
-);
-
-light.position.set(params.lightX, params.lightY, params.lightZ);
-light.castShadow = true;
-
-light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
-light.shadow.camera.near = 1;
-light.shadow.camera.far = 3000;
-light.shadow.camera.left = -1500;
-light.shadow.camera.right = 1500;
-light.shadow.camera.top = 1500;
-light.shadow.camera.bottom = -1500;
-light.shadow.bias = params.shadowBias;
-
-light.target.position.set(0, 0, 0);
-
-scene.add(light);
-scene.add(light.target);
-
-const source = new THREE.Mesh(
-  new THREE.CircleGeometry(1, 64),
-  new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    side: THREE.DoubleSide
-  })
-);
-
-source.position.set(params.lightX, params.lightY, params.lightZ);
-source.scale.setScalar(params.sourceSize);
-source.visible = params.sourceVisible;
-scene.add(source);
 
 let text;
 let composer;
 let godraysPass;
+
+const light = new THREE.SpotLight(
+  params.lightColor,
+  params.lightIntensity,
+  params.spotDistance,
+  THREE.MathUtils.degToRad(params.spotAngle),
+  params.spotPenumbra,
+  params.spotDecay
+);
+
+light.position.set(params.lightX, params.lightY, params.lightZ);
+light.target.position.set(0, 0, 0);
+light.castShadow = true;
+
+light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
+light.shadow.camera.near = 1;
+light.shadow.camera.far = params.spotDistance;
+light.shadow.bias = params.shadowBias;
+
+scene.add(light);
+scene.add(light.target);
 
 function rebuildText() {
   if (text) {
@@ -161,21 +148,19 @@ function rebuildText() {
 function updateLight() {
   light.color.set(params.lightColor);
   light.intensity = params.lightIntensity;
+  light.distance = params.spotDistance;
+  light.angle = THREE.MathUtils.degToRad(params.spotAngle);
+  light.penumbra = params.spotPenumbra;
+  light.decay = params.spotDecay;
+
   light.position.set(params.lightX, params.lightY, params.lightZ);
+  light.target.position.set(0, 0, 0);
 
   light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
+  light.shadow.camera.far = params.spotDistance;
   light.shadow.bias = params.shadowBias;
 
-  source.position.copy(light.position);
-
   light.shadow.camera.updateProjectionMatrix();
-  light.target.position.set(0, 0, 0);
-}
-
-function updateSource() {
-  source.material.color.set(params.sourceColor);
-  source.scale.setScalar(params.sourceSize);
-  source.visible = params.sourceVisible;
 }
 
 function updateGodrays() {
@@ -207,21 +192,24 @@ function setupGUI() {
   textFolder.add(params, 'textSize', 10, 500, 1).onFinishChange(rebuildText);
   textFolder.add(params, 'textDepth', 1, 200, 1).onFinishChange(rebuildText);
 
-  const lightFolder = gui.addFolder('Light');
+  const lightFolder = gui.addFolder('Spot Light');
+
   lightFolder.addColor(params, 'lightColor').onChange(updateLight);
-  lightFolder.add(params, 'lightIntensity', 0, 10, 0.1).onChange(updateLight);
+  lightFolder.add(params, 'lightIntensity', 0, 1000, 1).onChange(updateLight);
   lightFolder.add(params, 'lightX', -1500, 1500, 1).onChange(updateLight);
   lightFolder.add(params, 'lightY', -1500, 1500, 1).onChange(updateLight);
   lightFolder.add(params, 'lightZ', -3000, 1000, 1).onChange(updateLight);
+
+  lightFolder.add(params, 'spotAngle', 1, 90, 0.5).onChange(updateLight);
+  lightFolder.add(params, 'spotPenumbra', 0, 1, 0.01).onChange(updateLight);
+  lightFolder.add(params, 'spotDistance', 100, 5000, 10).onChange(updateLight);
+  lightFolder.add(params, 'spotDecay', 0, 2, 0.1).onChange(updateLight);
+
   lightFolder.add(params, 'shadowMapSize', [512, 1024, 2048, 4096]).onChange(updateLight);
   lightFolder.add(params, 'shadowBias', -0.01, 0.01, 0.00001).onChange(updateLight);
 
-  const sourceFolder = gui.addFolder('Source');
-  sourceFolder.addColor(params, 'sourceColor').onChange(updateSource);
-  sourceFolder.add(params, 'sourceSize', 1, 1000, 1).onChange(updateSource);
-  sourceFolder.add(params, 'sourceVisible').onChange(updateSource);
-
   const raysFolder = gui.addFolder('God Rays');
+
   raysFolder.add(params, 'density', 0, 0.05, 0.0001).onFinishChange(updateGodrays);
   raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onFinishChange(updateGodrays);
   raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onFinishChange(updateGodrays);
@@ -243,9 +231,7 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
     frameBufferType: THREE.HalfFloatType
   });
 
-  const renderPass = new RenderPass(scene, camera);
-  renderPass.renderToScreen = false;
-  composer.addPass(renderPass);
+  composer.addPass(new RenderPass(scene, camera));
 
   godraysPass = new GodraysPass(light, camera, {
     density: params.density,
