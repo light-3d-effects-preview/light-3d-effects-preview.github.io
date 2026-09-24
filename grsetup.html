@@ -133,7 +133,6 @@ light.position.set(
 );
 
 light.castShadow = true;
-
 light.shadow.mapSize.set(
   params.shadowMapSize,
   params.shadowMapSize
@@ -162,6 +161,25 @@ let text;
 let composer;
 let renderPass;
 let godraysPass;
+
+/*
+ * Труба фиксирована в сцене.
+ *
+ * Её центр совпадает с исходной позицией источника:
+ * X = 0
+ * Y = 0
+ * Z = -500
+ *
+ * Ось трубы направлена вдоль +Z.
+ * Поэтому:
+ *
+ * задний торец = -500 - length / 2
+ * открытый торец = -500 + length / 2
+ *
+ * lightZ меняет только положение источника внутри трубы.
+ */
+
+const tubeCenter = new THREE.Vector3(0, 0, -500);
 
 function createTube() {
   if (tube) {
@@ -193,15 +211,24 @@ function createTube() {
     })
   );
 
+  /*
+   * CylinderGeometry изначально ориентирован вдоль Y.
+   * Поворот +90° вокруг X переводит его ось в +Z.
+   */
   tube.rotation.x = Math.PI / 2;
-  tube.position.copy(light.position);
-  tube.position.z -= params.tubeLength / 2;
+  tube.position.copy(tubeCenter);
+
   tube.castShadow = true;
   tube.receiveShadow = true;
   tube.visible = params.tubeVisible;
 
   scene.add(tube);
 
+  /*
+   * Задняя крышка.
+   * Она находится на -Z конце трубы.
+   * Переднего диска нет — это открытый конец.
+   */
   tubeBack = new THREE.Mesh(
     new THREE.CircleGeometry(params.tubeRadius, 64),
     new THREE.MeshStandardMaterial({
@@ -213,8 +240,13 @@ function createTube() {
   );
 
   tubeBack.rotation.x = Math.PI / 2;
-  tubeBack.position.copy(light.position);
-  tubeBack.position.z -= params.tubeLength;
+
+  tubeBack.position.set(
+    tubeCenter.x,
+    tubeCenter.y,
+    tubeCenter.z - params.tubeLength / 2
+  );
+
   tubeBack.castShadow = true;
   tubeBack.receiveShadow = true;
   tubeBack.visible = params.tubeVisible;
@@ -258,6 +290,10 @@ function updateLight() {
   light.intensity = params.lightIntensity;
   light.distance = params.lightDistance;
 
+  /*
+   * Источник свободно перемещается.
+   * Труба при этом НЕ перемещается.
+   */
   light.position.set(
     params.lightX,
     params.lightY,
@@ -272,8 +308,6 @@ function updateLight() {
   light.shadow.bias = params.shadowBias;
   light.shadow.camera.far = params.lightDistance;
   light.shadow.camera.updateProjectionMatrix();
-
-  createTube();
 }
 
 function updateTopLight() {
@@ -289,12 +323,7 @@ function updateTopCamera() {
   topLight.position.copy(topCamera.position);
 }
 
-function updateGodrays() {
-  if (!composer || !godraysPass) return;
-
-  composer.removePass(godraysPass);
-  godraysPass.dispose();
-
+function createGodraysPass() {
   godraysPass = new GodraysPass(light, activeCamera, {
     density: params.density,
     maxDensity: params.maxDensity,
@@ -309,6 +338,15 @@ function updateGodrays() {
 
   godraysPass.renderToScreen = true;
   composer.addPass(godraysPass);
+}
+
+function updateGodrays() {
+  if (!composer || !godraysPass) return;
+
+  composer.removePass(godraysPass);
+  godraysPass.dispose();
+
+  createGodraysPass();
 }
 
 function switchCamera() {
@@ -327,21 +365,7 @@ function switchCamera() {
   if (godraysPass) {
     composer.removePass(godraysPass);
     godraysPass.dispose();
-
-    godraysPass = new GodraysPass(light, activeCamera, {
-      density: params.density,
-      maxDensity: params.maxDensity,
-      edgeStrength: params.edgeStrength,
-      edgeRadius: params.edgeRadius,
-      distanceAttenuation: params.distanceAttenuation,
-      color: new THREE.Color(params.lightColor),
-      raymarchSteps: params.raymarchSteps,
-      blur: params.blur,
-      gammaCorrection: params.gammaCorrection
-    });
-
-    godraysPass.renderToScreen = true;
-    composer.addPass(godraysPass);
+    createGodraysPass();
   }
 }
 
@@ -474,21 +498,7 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
   renderPass = new RenderPass(scene, activeCamera);
   composer.addPass(renderPass);
 
-  godraysPass = new GodraysPass(light, activeCamera, {
-    density: params.density,
-    maxDensity: params.maxDensity,
-    edgeStrength: params.edgeStrength,
-    edgeRadius: params.edgeRadius,
-    distanceAttenuation: params.distanceAttenuation,
-    color: new THREE.Color(params.lightColor),
-    raymarchSteps: params.raymarchSteps,
-    blur: params.blur,
-    gammaCorrection: params.gammaCorrection
-  });
-
-  godraysPass.renderToScreen = true;
-  composer.addPass(godraysPass);
-
+  createGodraysPass();
   setupGUI();
 
   function animate() {
