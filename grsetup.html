@@ -36,8 +36,26 @@ import GUI from 'lil-gui';
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
+const camera = new THREE.PerspectiveCamera(
+  45,
+  innerWidth / innerHeight,
+  0.1,
+  5000
+);
+
 camera.position.set(0, 0, 1000);
+
+const topCamera = new THREE.PerspectiveCamera(
+  75,
+  innerWidth / innerHeight,
+  0.1,
+  5000
+);
+
+topCamera.position.set(0, 1500, 0);
+topCamera.lookAt(0, 0, 0);
+
+let activeCamera = camera;
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -48,17 +66,25 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
+
 controls.enableZoom = false;
 controls.enablePan = false;
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+
 controls.minAzimuthAngle = -THREE.MathUtils.degToRad(30);
 controls.maxAzimuthAngle = THREE.MathUtils.degToRad(30);
-controls.minPolarAngle = Math.PI / 2 - THREE.MathUtils.degToRad(30);
-controls.maxPolarAngle = Math.PI / 2 + THREE.MathUtils.degToRad(30);
+
+controls.minPolarAngle =
+  Math.PI / 2 - THREE.MathUtils.degToRad(30);
+
+controls.maxPolarAngle =
+  Math.PI / 2 + THREE.MathUtils.degToRad(30);
+
 controls.target.set(0, 0, 0);
 controls.update();
 
@@ -87,7 +113,11 @@ const params = {
   distanceAttenuation: 1.5,
   raymarchSteps: 60,
   blur: true,
-  gammaCorrection: true
+  gammaCorrection: true,
+
+  topLightColor: '#ffffff',
+  topLightIntensity: 150000,
+  topLightDistance: 3000
 };
 
 const light = new THREE.PointLight(
@@ -96,18 +126,41 @@ const light = new THREE.PointLight(
   params.lightDistance
 );
 
-light.position.set(params.lightX, params.lightY, params.lightZ);
+light.position.set(
+  params.lightX,
+  params.lightY,
+  params.lightZ
+);
+
 light.castShadow = true;
-light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
+
+light.shadow.mapSize.set(
+  params.shadowMapSize,
+  params.shadowMapSize
+);
+
 light.shadow.camera.near = 1;
 light.shadow.camera.far = 2000;
 light.shadow.bias = params.shadowBias;
+
 scene.add(light);
+
+const topLight = new THREE.PointLight(
+  params.topLightColor,
+  params.topLightIntensity,
+  params.topLightDistance
+);
+
+topLight.position.copy(topCamera.position);
+topLight.visible = false;
+
+scene.add(topLight);
 
 let tube;
 let tubeBack;
 let text;
 let composer;
+let renderPass;
 let godraysPass;
 
 function createTube() {
@@ -146,6 +199,7 @@ function createTube() {
   tube.castShadow = true;
   tube.receiveShadow = true;
   tube.visible = params.tubeVisible;
+
   scene.add(tube);
 
   tubeBack = new THREE.Mesh(
@@ -164,11 +218,8 @@ function createTube() {
   tubeBack.castShadow = true;
   tubeBack.receiveShadow = true;
   tubeBack.visible = params.tubeVisible;
-  scene.add(tubeBack);
-}
 
-function updateTube() {
-  createTube();
+  scene.add(tubeBack);
 }
 
 function rebuildText() {
@@ -198,6 +249,7 @@ function rebuildText() {
   text = new THREE.Mesh(geometry, material);
   text.castShadow = true;
   text.receiveShadow = true;
+
   scene.add(text);
 }
 
@@ -205,11 +257,36 @@ function updateLight() {
   light.color.set(params.lightColor);
   light.intensity = params.lightIntensity;
   light.distance = params.lightDistance;
-  light.position.set(params.lightX, params.lightY, params.lightZ);
-  light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
-  light.shadow.bias = params.shadowBias;
 
-  updateTube();
+  light.position.set(
+    params.lightX,
+    params.lightY,
+    params.lightZ
+  );
+
+  light.shadow.mapSize.set(
+    params.shadowMapSize,
+    params.shadowMapSize
+  );
+
+  light.shadow.bias = params.shadowBias;
+  light.shadow.camera.far = params.lightDistance;
+  light.shadow.camera.updateProjectionMatrix();
+
+  createTube();
+}
+
+function updateTopLight() {
+  topLight.color.set(params.topLightColor);
+  topLight.intensity = params.topLightIntensity;
+  topLight.distance = params.topLightDistance;
+  topLight.position.copy(topCamera.position);
+}
+
+function updateTopCamera() {
+  topCamera.aspect = innerWidth / innerHeight;
+  topCamera.updateProjectionMatrix();
+  topLight.position.copy(topCamera.position);
 }
 
 function updateGodrays() {
@@ -218,7 +295,7 @@ function updateGodrays() {
   composer.removePass(godraysPass);
   godraysPass.dispose();
 
-  godraysPass = new GodraysPass(light, camera, {
+  godraysPass = new GodraysPass(light, activeCamera, {
     density: params.density,
     maxDensity: params.maxDensity,
     edgeStrength: params.edgeStrength,
@@ -234,37 +311,150 @@ function updateGodrays() {
   composer.addPass(godraysPass);
 }
 
+function switchCamera() {
+  if (activeCamera === camera) {
+    activeCamera = topCamera;
+    topLight.visible = true;
+    controls.enabled = false;
+  } else {
+    activeCamera = camera;
+    topLight.visible = false;
+    controls.enabled = true;
+  }
+
+  renderPass.camera = activeCamera;
+
+  if (godraysPass) {
+    composer.removePass(godraysPass);
+    godraysPass.dispose();
+
+    godraysPass = new GodraysPass(light, activeCamera, {
+      density: params.density,
+      maxDensity: params.maxDensity,
+      edgeStrength: params.edgeStrength,
+      edgeRadius: params.edgeRadius,
+      distanceAttenuation: params.distanceAttenuation,
+      color: new THREE.Color(params.lightColor),
+      raymarchSteps: params.raymarchSteps,
+      blur: params.blur,
+      gammaCorrection: params.gammaCorrection
+    });
+
+    godraysPass.renderToScreen = true;
+    composer.addPass(godraysPass);
+  }
+}
+
 function setupGUI() {
   const gui = new GUI({ title: 'God Rays' });
 
+  gui.add({ switchCamera }, 'switchCamera').name('Switch Camera');
+
   const textFolder = gui.addFolder('Text');
-  textFolder.add(params, 'textSize', 10, 500, 1).onFinishChange(rebuildText);
-  textFolder.add(params, 'textDepth', 1, 200, 1).onFinishChange(rebuildText);
+
+  textFolder
+    .add(params, 'textSize', 10, 500, 1)
+    .onFinishChange(rebuildText);
+
+  textFolder
+    .add(params, 'textDepth', 1, 200, 1)
+    .onFinishChange(rebuildText);
 
   const lightFolder = gui.addFolder('Light');
-  lightFolder.addColor(params, 'lightColor').onChange(updateLight);
-  lightFolder.add(params, 'lightIntensity', 0, 200000, 1000).onChange(updateLight);
-  lightFolder.add(params, 'lightDistance', 100, 10000, 100).onChange(updateLight);
-  lightFolder.add(params, 'lightX', -1500, 1500, 1).onChange(updateLight);
-  lightFolder.add(params, 'lightY', -1500, 1500, 1).onChange(updateLight);
-  lightFolder.add(params, 'lightZ', -3000, 1000, 1).onChange(updateLight);
-  lightFolder.add(params, 'shadowMapSize', [512, 1024, 2048, 4096]).onChange(updateLight);
-  lightFolder.add(params, 'shadowBias', -0.01, 0.01, 0.00001).onChange(updateLight);
+
+  lightFolder
+    .addColor(params, 'lightColor')
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'lightIntensity', 0, 200000, 1000)
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'lightDistance', 100, 10000, 100)
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'lightX', -1500, 1500, 1)
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'lightY', -1500, 1500, 1)
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'lightZ', -3000, 1000, 1)
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'shadowMapSize', [512, 1024, 2048, 4096])
+    .onChange(updateLight);
+
+  lightFolder
+    .add(params, 'shadowBias', -0.01, 0.01, 0.00001)
+    .onChange(updateLight);
 
   const tubeFolder = gui.addFolder('Light Tube');
-  tubeFolder.add(params, 'tubeRadius', 20, 300, 1).onFinishChange(updateTube);
-  tubeFolder.add(params, 'tubeLength', 20, 500, 1).onFinishChange(updateTube);
-  tubeFolder.add(params, 'tubeVisible').onChange(updateTube);
+
+  tubeFolder
+    .add(params, 'tubeRadius', 20, 300, 1)
+    .onFinishChange(createTube);
+
+  tubeFolder
+    .add(params, 'tubeLength', 20, 500, 1)
+    .onFinishChange(createTube);
+
+  tubeFolder
+    .add(params, 'tubeVisible')
+    .onChange(createTube);
+
+  const topLightFolder = gui.addFolder('Top Camera Light');
+
+  topLightFolder
+    .addColor(params, 'topLightColor')
+    .onChange(updateTopLight);
+
+  topLightFolder
+    .add(params, 'topLightIntensity', 0, 300000, 1000)
+    .onChange(updateTopLight);
+
+  topLightFolder
+    .add(params, 'topLightDistance', 100, 5000, 100)
+    .onChange(updateTopLight);
 
   const raysFolder = gui.addFolder('God Rays');
-  raysFolder.add(params, 'density', 0, 0.05, 0.0001).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'edgeRadius', 0, 10, 0.1).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'distanceAttenuation', 0, 10, 0.1).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'raymarchSteps', 10, 120, 1).onFinishChange(updateGodrays);
-  raysFolder.add(params, 'blur').onFinishChange(updateGodrays);
-  raysFolder.add(params, 'gammaCorrection').onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'density', 0, 0.05, 0.0001)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'maxDensity', 0, 2, 0.01)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'edgeStrength', 0, 10, 0.1)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'edgeRadius', 0, 10, 0.1)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'distanceAttenuation', 0, 10, 0.1)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'raymarchSteps', 10, 120, 1)
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'blur')
+    .onFinishChange(updateGodrays);
+
+  raysFolder
+    .add(params, 'gammaCorrection')
+    .onFinishChange(updateGodrays);
 
   gui.close();
 }
@@ -274,14 +464,17 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
 
   rebuildText();
   createTube();
+  updateTopCamera();
+  updateTopLight();
 
   composer = new EffectComposer(renderer, {
     frameBufferType: THREE.HalfFloatType
   });
 
-  composer.addPass(new RenderPass(scene, camera));
+  renderPass = new RenderPass(scene, activeCamera);
+  composer.addPass(renderPass);
 
-  godraysPass = new GodraysPass(light, camera, {
+  godraysPass = new GodraysPass(light, activeCamera, {
     density: params.density,
     maxDensity: params.maxDensity,
     edgeStrength: params.edgeStrength,
@@ -300,6 +493,7 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
 
   function animate() {
     requestAnimationFrame(animate);
+
     controls.update();
     composer.render();
   }
@@ -310,6 +504,9 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+
+  updateTopCamera();
+
   renderer.setSize(innerWidth, innerHeight);
   composer?.setSize(innerWidth, innerHeight);
 });
