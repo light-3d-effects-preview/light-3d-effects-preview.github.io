@@ -10,7 +10,7 @@
     canvas { display: block; width: 100%; height: 100%; }
   </style>
 
-  <script type="importmap">
+<script type="importmap">
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
@@ -24,7 +24,7 @@
 
 <body>
 <script type="module">
-import * as THREE from 'three';
+  import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { EffectComposer, RenderPass } from 'postprocessing';
@@ -35,119 +35,88 @@ scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
 camera.position.set(0, 0, 1000);
-camera.lookAt(0, 0, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// Light behind the text
-const light = new THREE.PointLight(0xffb27a, 120000, 4000);
+const light = new THREE.PointLight(0xffaa66, 100000, 3000);
 light.position.set(0, 0, -500);
 light.castShadow = true;
-light.shadow.mapSize.width = 2048;
-light.shadow.mapSize.height = 2048;
-light.shadow.camera.near = 1;
-light.shadow.camera.far = 2000;
-light.shadow.bias = -0.0005;
+light.shadow.mapSize.set(2048, 2048);
+light.shadow.camera.near = 0.1;
+light.shadow.camera.far = 3000;
 scene.add(light);
 
-// Visible light source
 const source = new THREE.Mesh(
-  new THREE.SphereGeometry(55, 64, 64),
-  new THREE.MeshBasicMaterial({ color: 0xffd0a0 })
+  new THREE.SphereGeometry(50, 32, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffcc88 })
 );
 source.position.copy(light.position);
 scene.add(source);
 
-// Soft halo
-const halo = new THREE.Mesh(
-  new THREE.SphereGeometry(110, 64, 64),
-  new THREE.MeshBasicMaterial({ color: 0xff9a55, transparent: true, opacity: 0.08, depthWrite: false })
-);
-halo.position.copy(light.position);
-scene.add(halo);
-
-// Text
-const fontLoader = new FontLoader();
-
-fontLoader.load('./Montserrat.typeface.json', (font) => {
+new FontLoader().load('./Montserrat.typeface.json', font => {
   const geometry = new TextGeometry('ЦЕНТРСВЕТ', {
     font,
     size: 150,
-    depth: 35,
-    curveSegments: 16,
+    depth: 30,
+    curveSegments: 12,
     bevelEnabled: true,
-    bevelThickness: 6,
-    bevelSize: 3,
-    bevelSegments: 6
+    bevelThickness: 5,
+    bevelSize: 2,
+    bevelSegments: 4
   });
 
-  geometry.computeBoundingBox();
-  const center = new THREE.Vector3();
-  geometry.boundingBox.getCenter(center);
-  geometry.translate(-center.x, -center.y, -center.z);
+  geometry.center();
 
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xffc7a0,
-    emissive: 0x401508,
-    emissiveIntensity: 1.8,
-    roughness: 0.28,
-    metalness: 0.15
-  });
+  const text = new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0x331100,
+      emissiveIntensity: 1
+    })
+  );
 
-  const text = new THREE.Mesh(geometry, material);
-  text.position.set(0, 0, 0);
   text.castShadow = true;
   text.receiveShadow = true;
   scene.add(text);
 
-  // God Rays
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
-  composer.addPass(new RenderPass(scene, camera));
 
-  const godraysPass = new GodraysPass(light, camera, {
-    density: 1 / 90,
-    maxDensity: 0.75,
-    edgeStrength: 3.0,
-    edgeRadius: 2.0,
-    distanceAttenuation: 1.5,
-    color: new THREE.Color(0xffb078),
-    raymarchSteps: 100,
+  const renderPass = new RenderPass(scene, camera);
+  renderPass.renderToScreen = false;
+  composer.addPass(renderPass);
+
+  const godrays = new GodraysPass(light, camera, {
+    density: 1 / 128,
+    maxDensity: 0.5,
+    edgeStrength: 2,
+    edgeRadius: 2,
+    distanceAttenuation: 2,
+    color: new THREE.Color(0xffaa66),
+    raymarchSteps: 60,
     blur: true,
     gammaCorrection: true
   });
 
-  godraysPass.renderToScreen = true;
-  composer.addPass(godraysPass);
-
-  const clock = new THREE.Clock();
+  godrays.renderToScreen = true;
+  composer.addPass(godrays);
 
   function animate() {
     requestAnimationFrame(animate);
-
-    const time = clock.getElapsedTime();
-
-    light.position.x = Math.sin(time * 0.35) * 80;
-    light.position.y = Math.cos(time * 0.45) * 35;
-
-    source.position.copy(light.position);
-    halo.position.copy(light.position);
-
-    const pulse = 1 + Math.sin(time * 2.0) * 0.08;
-    source.scale.setScalar(pulse);
-    halo.scale.setScalar(pulse);
-
     composer.render();
   }
 
   animate();
+}, undefined, error => {
+  console.error('FONT ERROR:', error);
 });
 
-window.addEventListener('resize', () => {
+addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
