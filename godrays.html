@@ -45,7 +45,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 // Light behind the text
-const light = new THREE.PointLight(0xffb27a, 120000, 4000);
+const light = new THREE.PointLight(0xffb27a, 30000, 4000);
 light.position.set(0, 0, -500);
 light.castShadow = true;
 light.shadow.mapSize.width = 2048;
@@ -56,8 +56,12 @@ light.shadow.bias = -0.0005;
 scene.add(light);
 
 // Visible light source
+// const source = new THREE.Mesh(
+//   new THREE.SphereGeometry(55, 64, 64),
+//   new THREE.MeshBasicMaterial({ color: 0xffd0a0 })
+// );
 const source = new THREE.Mesh(
-  new THREE.SphereGeometry(55, 64, 64),
+  new THREE.SphereGeometry(45, 64, 64),
   new THREE.MeshBasicMaterial({ color: 0xffd0a0 })
 );
 source.position.copy(light.position);
@@ -91,11 +95,19 @@ fontLoader.load('./Montserrat.typeface.json', (font) => {
   geometry.boundingBox.getCenter(center);
   geometry.translate(-center.x, -center.y, -center.z);
 
+  // const material = new THREE.MeshStandardMaterial({
+  //   color: 0xffc7a0,
+  //   emissive: 0x401508,
+  //   emissiveIntensity: 1.8,
+  //   roughness: 0.28,
+  //   metalness: 0.15
+  // });
+
   const material = new THREE.MeshStandardMaterial({
     color: 0xffc7a0,
     emissive: 0x401508,
-    emissiveIntensity: 1.8,
-    roughness: 0.28,
+    emissiveIntensity: 0.5,
+    roughness: 0.35,
     metalness: 0.15
   });
 
@@ -109,17 +121,30 @@ fontLoader.load('./Montserrat.typeface.json', (font) => {
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
   composer.addPass(new RenderPass(scene, camera));
 
+  // const godraysPass = new GodraysPass(light, camera, {
+  //   density: 1 / 90,
+  //   maxDensity: 0.75,
+  //   edgeStrength: 3.0,
+  //   edgeRadius: 2.0,
+  //   distanceAttenuation: 1.5,
+  //   color: new THREE.Color(0xffb078),
+  //   raymarchSteps: 100,
+  //   blur: true,
+  //   gammaCorrection: true
+  // });
+
   const godraysPass = new GodraysPass(light, camera, {
-    density: 1 / 90,
-    maxDensity: 0.75,
-    edgeStrength: 3.0,
-    edgeRadius: 2.0,
-    distanceAttenuation: 1.5,
+    density: 1 / 150,
+    maxDensity: 0.35,
+    edgeStrength: 1.5,
+    edgeRadius: 2,
+    distanceAttenuation: 2,
     color: new THREE.Color(0xffb078),
     raymarchSteps: 100,
     blur: true,
     gammaCorrection: true
   });
+
 
   godraysPass.renderToScreen = true;
   composer.addPass(godraysPass);
