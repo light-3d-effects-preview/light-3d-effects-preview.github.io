@@ -67,15 +67,15 @@ const params = {
   textDepth: 35,
 
   lightColor: '#ffb27a',
-  lightIntensity: 150,
+  lightIntensity: 120000,
+  lightDistance: 4000,
   lightX: 0,
   lightY: 0,
   lightZ: -500,
 
-  spotAngle: 28,
-  spotPenumbra: 0.45,
-  spotDistance: 3000,
-  spotDecay: 1,
+  tubeRadius: 90,
+  tubeLength: 180,
+  tubeVisible: false,
 
   shadowMapSize: 2048,
   shadowBias: -0.0005,
@@ -90,30 +90,86 @@ const params = {
   gammaCorrection: true
 };
 
+const light = new THREE.PointLight(
+  params.lightColor,
+  params.lightIntensity,
+  params.lightDistance
+);
+
+light.position.set(params.lightX, params.lightY, params.lightZ);
+light.castShadow = true;
+light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
+light.shadow.camera.near = 1;
+light.shadow.camera.far = 2000;
+light.shadow.bias = params.shadowBias;
+scene.add(light);
+
+let tube;
+let tubeBack;
 let text;
 let composer;
 let godraysPass;
 
-const light = new THREE.SpotLight(
-  params.lightColor,
-  params.lightIntensity,
-  params.spotDistance,
-  THREE.MathUtils.degToRad(params.spotAngle),
-  params.spotPenumbra,
-  params.spotDecay
-);
+function createTube() {
+  if (tube) {
+    scene.remove(tube);
+    tube.geometry.dispose();
+    tube.material.dispose();
+  }
 
-light.position.set(params.lightX, params.lightY, params.lightZ);
-light.target.position.set(0, 0, 0);
-light.castShadow = true;
+  if (tubeBack) {
+    scene.remove(tubeBack);
+    tubeBack.geometry.dispose();
+    tubeBack.material.dispose();
+  }
 
-light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
-light.shadow.camera.near = 1;
-light.shadow.camera.far = params.spotDistance;
-light.shadow.bias = params.shadowBias;
+  tube = new THREE.Mesh(
+    new THREE.CylinderGeometry(
+      params.tubeRadius,
+      params.tubeRadius,
+      params.tubeLength,
+      64,
+      1,
+      true
+    ),
+    new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      roughness: 1,
+      metalness: 0,
+      side: THREE.DoubleSide
+    })
+  );
 
-scene.add(light);
-scene.add(light.target);
+  tube.rotation.x = Math.PI / 2;
+  tube.position.copy(light.position);
+  tube.position.z -= params.tubeLength / 2;
+  tube.castShadow = true;
+  tube.receiveShadow = true;
+  tube.visible = params.tubeVisible;
+  scene.add(tube);
+
+  tubeBack = new THREE.Mesh(
+    new THREE.CircleGeometry(params.tubeRadius, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      roughness: 1,
+      metalness: 0,
+      side: THREE.DoubleSide
+    })
+  );
+
+  tubeBack.rotation.x = Math.PI / 2;
+  tubeBack.position.copy(light.position);
+  tubeBack.position.z -= params.tubeLength;
+  tubeBack.castShadow = true;
+  tubeBack.receiveShadow = true;
+  tubeBack.visible = params.tubeVisible;
+  scene.add(tubeBack);
+}
+
+function updateTube() {
+  createTube();
+}
 
 function rebuildText() {
   if (text) {
@@ -148,19 +204,12 @@ function rebuildText() {
 function updateLight() {
   light.color.set(params.lightColor);
   light.intensity = params.lightIntensity;
-  light.distance = params.spotDistance;
-  light.angle = THREE.MathUtils.degToRad(params.spotAngle);
-  light.penumbra = params.spotPenumbra;
-  light.decay = params.spotDecay;
-
+  light.distance = params.lightDistance;
   light.position.set(params.lightX, params.lightY, params.lightZ);
-  light.target.position.set(0, 0, 0);
-
   light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
-  light.shadow.camera.far = params.spotDistance;
   light.shadow.bias = params.shadowBias;
 
-  light.shadow.camera.updateProjectionMatrix();
+  updateTube();
 }
 
 function updateGodrays() {
@@ -192,24 +241,22 @@ function setupGUI() {
   textFolder.add(params, 'textSize', 10, 500, 1).onFinishChange(rebuildText);
   textFolder.add(params, 'textDepth', 1, 200, 1).onFinishChange(rebuildText);
 
-  const lightFolder = gui.addFolder('Spot Light');
-
+  const lightFolder = gui.addFolder('Light');
   lightFolder.addColor(params, 'lightColor').onChange(updateLight);
-  lightFolder.add(params, 'lightIntensity', 0, 1000, 1).onChange(updateLight);
+  lightFolder.add(params, 'lightIntensity', 0, 200000, 1000).onChange(updateLight);
+  lightFolder.add(params, 'lightDistance', 100, 10000, 100).onChange(updateLight);
   lightFolder.add(params, 'lightX', -1500, 1500, 1).onChange(updateLight);
   lightFolder.add(params, 'lightY', -1500, 1500, 1).onChange(updateLight);
   lightFolder.add(params, 'lightZ', -3000, 1000, 1).onChange(updateLight);
-
-  lightFolder.add(params, 'spotAngle', 1, 90, 0.5).onChange(updateLight);
-  lightFolder.add(params, 'spotPenumbra', 0, 1, 0.01).onChange(updateLight);
-  lightFolder.add(params, 'spotDistance', 100, 5000, 10).onChange(updateLight);
-  lightFolder.add(params, 'spotDecay', 0, 2, 0.1).onChange(updateLight);
-
   lightFolder.add(params, 'shadowMapSize', [512, 1024, 2048, 4096]).onChange(updateLight);
   lightFolder.add(params, 'shadowBias', -0.01, 0.01, 0.00001).onChange(updateLight);
 
-  const raysFolder = gui.addFolder('God Rays');
+  const tubeFolder = gui.addFolder('Light Tube');
+  tubeFolder.add(params, 'tubeRadius', 20, 300, 1).onFinishChange(updateTube);
+  tubeFolder.add(params, 'tubeLength', 20, 500, 1).onFinishChange(updateTube);
+  tubeFolder.add(params, 'tubeVisible').onChange(updateTube);
 
+  const raysFolder = gui.addFolder('God Rays');
   raysFolder.add(params, 'density', 0, 0.05, 0.0001).onFinishChange(updateGodrays);
   raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onFinishChange(updateGodrays);
   raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onFinishChange(updateGodrays);
@@ -226,6 +273,7 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
   window.loadedFont = font;
 
   rebuildText();
+  createTube();
 
   composer = new EffectComposer(renderer, {
     frameBufferType: THREE.HalfFloatType
