@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=UTF-8 />
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/",
+          "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.39.1/build/index.js",
+          "goodrays": "https://cdn.jsdelivr.net/npm/three-good-godrays@0.12.0/build/three-good-godrays.esm.js"
+        }
+      }
+      </script>
+  </head>
+  <body>
+
+    <!-- <script src="postprocessing.min.js"></script> -->
+    <script type="module">
+      import * as THREE from 'three';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+      import { Font } from 'three/addons/loaders/FontLoader.js';
+      import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+      import { EffectComposer, RenderPass } from 'postprocessing';
+      import { GodraysPass } from 'goodrays';
+
+      let scene;
+      let camera;
+      let renderer;
+      let composer;
+      let controls;
+
+      function init() {
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020202);
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 50000 );
+
+        camera.position.y = 510;
+        camera.position.z = 500;
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+        document.body.appendChild(renderer.domElement);
+
+        controls = new OrbitControls( camera, renderer.domElement );
+        controls.panSpeed = 0.1;
+        controls.rotateSpeed = 0.1;
+        controls.update();
+
+        const directionalLight = new THREE.DirectionalLight( 0xffccaa, 3 );
+        directionalLight.position.set(0, 0, -1);
+        scene.add(directionalLight);
+
+        const pointLight = new THREE.PointLight( 0xffccaa, 5000 );
+        pointLight.position.set( 0, 100, -500 );
+        scene.add(pointLight);
+
+        const circleGeo = new THREE.CircleGeometry( 220, 50 );
+        const circleMat = new THREE.MeshBasicMaterial({ color: 0xffccaa });
+        const circle = new THREE.Mesh( circleGeo, circleMat );
+        circle.position.copy(pointLight.position);
+        circle.scale.x = 1.2;
+        scene.add(circle);
+
+        composer = new EffectComposer(renderer);
+
+        const renderPass = new RenderPass( scene, camera );
+
+        composer.addPass(renderPass);
+
+        const godraysPass = new GodraysPass( pointLight, camera, {
+          density: 1 / 128,
+          maxDensity: 0.5,
+          edgeStrength: 2,
+          edgeRadius: 2,
+          distanceAttenuation: 2,
+          color: new THREE.Color(0xffccaa),
+          raymarchSteps: 60,
+          blur: true,
+          gammaCorrection: true
+        });
+
+        composer.addPass(godraysPass);
+
+        const loader = new TTFLoader();
+
+        loader.load('Montserrat-Regular.ttf', (json) => {
+          const font = new Font(json);
+
+          const geometry = new TextGeometry('ЦЕНТРСВЕТ', {
+              font,
+              size: 100,
+              depth: 20,
+              curveSegments: 12,
+              bevelEnabled: true,
+              bevelThickness: 3,
+              bevelSize: 2,
+              bevelSegments: 4
+          });
+
+          geometry.center();
+
+          const material = new THREE.MeshStandardMaterial({
+              color: 0xffccaa,
+              emissive: 0xff4422,
+              emissiveIntensity: 2
+          });
+
+          const text = new THREE.Mesh(geometry, material);
+          text.position.set(0, 100, -500);
+
+          scene.add(text);
+        });
+
+        function animate() {
+          requestAnimationFrame(animate);
+          composer.render();
+        }
+      }
+
+      init();
+    </script>
+
+  </body>
+</html>
