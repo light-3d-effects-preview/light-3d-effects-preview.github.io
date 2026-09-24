@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ЦЕНТРСВЕТ — God Rays</title>
+
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/",
+      "postprocessing": "https://cdn.jsdelivr.net/npm/postprocessing@6.39.1/build/index.js",
+      "three-good-godrays": "https://cdn.jsdelivr.net/npm/three-good-godrays@0.12.1/build/three-good-godrays.esm.js",
+      "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.20/+esm"
+    }
+  }
+  </script>
+</head>
+
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { EffectComposer, RenderPass } from 'postprocessing';
+import { GodraysPass } from 'three-good-godrays';
+import GUI from 'lil-gui';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
+camera.position.set(0, 0, 1000);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const light = new THREE.PointLight(0xffb27a, 120000, 4000);
+light.position.set(0, 0, -500);
+light.castShadow = true;
+light.shadow.mapSize.set(2048, 2048);
+light.shadow.camera.near = 1;
+light.shadow.camera.far = 2000;
+light.shadow.bias = -0.0005;
+scene.add(light);
+
+const source = new THREE.Mesh(
+  new THREE.SphereGeometry(55, 64, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffd0a0 })
+);
+source.position.copy(light.position);
+scene.add(source);
+
+const halo = new THREE.Mesh(
+  new THREE.SphereGeometry(110, 64, 64),
+  new THREE.MeshBasicMaterial({
+    color: 0xff9a55,
+    transparent: true,
+    opacity: 0.08,
+    depthWrite: false
+  })
+);
+halo.position.copy(light.position);
+scene.add(halo);
+
+let text;
+let composer;
+let godraysPass;
+
+const params = {
+  text: 'ЦЕНТРСВЕТ',
+
+  textSize: 150,
+  textDepth: 35,
+  curveSegments: 16,
+  bevelEnabled: true,
+  bevelThickness: 6,
+  bevelSize: 3,
+  bevelSegments: 6,
+
+  textX: 0,
+  textY: 0,
+  textZ: 0,
+  textRotationX: 0,
+  textRotationY: 0,
+  textRotationZ: 0,
+
+  textColor: '#ffc7a0',
+  emissiveColor: '#401508',
+  emissiveIntensity: 1.8,
+  roughness: 0.28,
+  metalness: 0.15,
+
+  lightColor: '#ffb27a',
+  lightIntensity: 120000,
+  lightDistance: 4000,
+  lightX: 0,
+  lightY: 0,
+  lightZ: -500,
+
+  sourceColor: '#ffd0a0',
+  sourceSize: 55,
+  sourceVisible: true,
+
+  haloColor: '#ff9a55',
+  haloOpacity: 0.08,
+  haloSize: 110,
+  haloVisible: true,
+
+  density: 1 / 90,
+  maxDensity: 0.75,
+  edgeStrength: 3,
+  edgeRadius: 2,
+  distanceAttenuation: 1.5,
+  raymarchSteps: 100,
+  blur: true,
+  gammaCorrection: true,
+
+  shadowMapSize: 2048,
+  shadowBias: -0.0005,
+
+  animateLight: true,
+  animationX: 80,
+  animationY: 35,
+  animationSpeedX: 0.35,
+  animationSpeedY: 0.45,
+  pulseSource: true,
+  pulseAmount: 0.08,
+  pulseSpeed: 2
+};
+
+function rebuildText() {
+  if (text) {
+    scene.remove(text);
+    text.geometry.dispose();
+    text.material.dispose();
+  }
+
+  const font = window.loadedFont;
+
+  const geometry = new TextGeometry(params.text, {
+    font,
+    size: params.textSize,
+    depth: params.textDepth,
+    curveSegments: params.curveSegments,
+    bevelEnabled: params.bevelEnabled,
+    bevelThickness: params.bevelThickness,
+    bevelSize: params.bevelSize,
+    bevelSegments: params.bevelSegments
+  });
+
+  geometry.center();
+
+  const material = new THREE.MeshStandardMaterial({
+    color: params.textColor,
+    emissive: params.emissiveColor,
+    emissiveIntensity: params.emissiveIntensity,
+    roughness: params.roughness,
+    metalness: params.metalness
+  });
+
+  text = new THREE.Mesh(geometry, material);
+  text.castShadow = true;
+  text.receiveShadow = true;
+
+  updateTextTransform();
+
+  scene.add(text);
+}
+
+function updateTextTransform() {
+  if (!text) return;
+
+  text.position.set(params.textX, params.textY, params.textZ);
+  text.rotation.set(
+    THREE.MathUtils.degToRad(params.textRotationX),
+    THREE.MathUtils.degToRad(params.textRotationY),
+    THREE.MathUtils.degToRad(params.textRotationZ)
+  );
+}
+
+function updateLight() {
+  light.color.set(params.lightColor);
+  light.intensity = params.lightIntensity;
+  light.distance = params.lightDistance;
+
+  light.position.set(params.lightX, params.lightY, params.lightZ);
+
+  light.shadow.mapSize.set(params.shadowMapSize, params.shadowMapSize);
+  light.shadow.bias = params.shadowBias;
+
+  source.position.copy(light.position);
+  halo.position.copy(light.position);
+}
+
+function updateSource() {
+  source.material.color.set(params.sourceColor);
+  source.scale.setScalar(params.sourceSize / 55);
+  source.visible = params.sourceVisible;
+
+  halo.material.color.set(params.haloColor);
+  halo.material.opacity = params.haloOpacity;
+  halo.scale.setScalar(params.haloSize / 110);
+  halo.visible = params.haloVisible;
+}
+
+function updateGodrays() {
+  if (!godraysPass) return;
+
+  godraysPass.density = params.density;
+  godraysPass.maxDensity = params.maxDensity;
+  godraysPass.edgeStrength = params.edgeStrength;
+  godraysPass.edgeRadius = params.edgeRadius;
+  godraysPass.distanceAttenuation = params.distanceAttenuation;
+  godraysPass.raymarchSteps = params.raymarchSteps;
+  godraysPass.blur = params.blur;
+  godraysPass.gammaCorrection = params.gammaCorrection;
+  godraysPass.color.set(params.lightColor);
+}
+
+function setupGUI() {
+  const gui = new GUI({ title: 'God Rays' });
+
+  const textFolder = gui.addFolder('Text');
+
+  textFolder.add(params, 'text').onFinishChange(rebuildText);
+  textFolder.add(params, 'textSize', 10, 500, 1).onFinishChange(rebuildText);
+  textFolder.add(params, 'textDepth', 1, 200, 1).onFinishChange(rebuildText);
+  textFolder.add(params, 'curveSegments', 1, 32, 1).onFinishChange(rebuildText);
+  textFolder.add(params, 'bevelEnabled').onChange(rebuildText);
+  textFolder.add(params, 'bevelThickness', 0, 30, 0.5).onFinishChange(rebuildText);
+  textFolder.add(params, 'bevelSize', 0, 20, 0.5).onFinishChange(rebuildText);
+  textFolder.add(params, 'bevelSegments', 1, 12, 1).onFinishChange(rebuildText);
+
+  textFolder.add(params, 'textX', -1000, 1000, 1).onChange(updateTextTransform);
+  textFolder.add(params, 'textY', -1000, 1000, 1).onChange(updateTextTransform);
+  textFolder.add(params, 'textZ', -1000, 1000, 1).onChange(updateTextTransform);
+  textFolder.add(params, 'textRotationX', -180, 180, 1).onChange(updateTextTransform);
+  textFolder.add(params, 'textRotationY', -180, 180, 1).onChange(updateTextTransform);
+  textFolder.add(params, 'textRotationZ', -180, 180, 1).onChange(updateTextTransform);
+
+  textFolder.addColor(params, 'textColor').onChange(() => text.material.color.set(params.textColor));
+  textFolder.addColor(params, 'emissiveColor').onChange(() => text.material.emissive.set(params.emissiveColor));
+  textFolder.add(params, 'emissiveIntensity', 0, 10, 0.05).onChange(() => text.material.emissiveIntensity = params.emissiveIntensity);
+  textFolder.add(params, 'roughness', 0, 1, 0.01).onChange(() => text.material.roughness = params.roughness);
+  textFolder.add(params, 'metalness', 0, 1, 0.01).onChange(() => text.material.metalness = params.metalness);
+
+  const lightFolder = gui.addFolder('Light');
+
+  lightFolder.addColor(params, 'lightColor').onChange(updateLight);
+  lightFolder.add(params, 'lightIntensity', 0, 200000, 1000).onChange(updateLight);
+  lightFolder.add(params, 'lightDistance', 100, 10000, 100).onChange(updateLight);
+  lightFolder.add(params, 'lightX', -1000, 1000, 1).onChange(updateLight);
+  lightFolder.add(params, 'lightY', -1000, 1000, 1).onChange(updateLight);
+  lightFolder.add(params, 'lightZ', -2000, 500, 1).onChange(updateLight);
+  lightFolder.add(params, 'shadowMapSize', [512, 1024, 2048, 4096]).onChange(updateLight);
+  lightFolder.add(params, 'shadowBias', -0.01, 0.01, 0.00001).onChange(updateLight);
+
+  const sourceFolder = gui.addFolder('Source');
+
+  sourceFolder.addColor(params, 'sourceColor').onChange(updateSource);
+  sourceFolder.add(params, 'sourceSize', 1, 300, 1).onChange(updateSource);
+  sourceFolder.add(params, 'sourceVisible').onChange(updateSource);
+
+  sourceFolder.addColor(params, 'haloColor').onChange(updateSource);
+  sourceFolder.add(params, 'haloOpacity', 0, 1, 0.01).onChange(updateSource);
+  sourceFolder.add(params, 'haloSize', 1, 500, 1).onChange(updateSource);
+  sourceFolder.add(params, 'haloVisible').onChange(updateSource);
+
+  const raysFolder = gui.addFolder('God Rays');
+
+  raysFolder.add(params, 'density', 0, 0.05, 0.0001).onChange(updateGodrays);
+  raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onChange(updateGodrays);
+  raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onChange(updateGodrays);
+  raysFolder.add(params, 'edgeRadius', 0, 10, 0.1).onChange(updateGodrays);
+  raysFolder.add(params, 'distanceAttenuation', 0, 10, 0.1).onChange(updateGodrays);
+  raysFolder.add(params, 'raymarchSteps', 10, 300, 1).onChange(updateGodrays);
+  raysFolder.add(params, 'blur').onChange(updateGodrays);
+  raysFolder.add(params, 'gammaCorrection').onChange(updateGodrays);
+
+  const animationFolder = gui.addFolder('Animation');
+
+  animationFolder.add(params, 'animateLight');
+  animationFolder.add(params, 'animationX', 0, 500, 1);
+  animationFolder.add(params, 'animationY', 0, 500, 1);
+  animationFolder.add(params, 'animationSpeedX', 0, 3, 0.01);
+  animationFolder.add(params, 'animationSpeedY', 0, 3, 0.01);
+  animationFolder.add(params, 'pulseSource');
+  animationFolder.add(params, 'pulseAmount', 0, 0.5, 0.01);
+  animationFolder.add(params, 'pulseSpeed', 0, 10, 0.1);
+
+  gui.close();
+}
+
+new FontLoader().load('./Montserrat.typeface.json', font => {
+  window.loadedFont = font;
+  rebuildText();
+
+  const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
+  composer.addPass(new RenderPass(scene, camera));
+
+  godraysPass = new GodraysPass(light, camera, {
+    density: params.density,
+    maxDensity: params.maxDensity,
+    edgeStrength: params.edgeStrength,
+    edgeRadius: params.edgeRadius,
+    distanceAttenuation: params.distanceAttenuation,
+    color: new THREE.Color(params.lightColor),
+    raymarchSteps: params.raymarchSteps,
+    blur: params.blur,
+    gammaCorrection: params.gammaCorrection
+  });
+
+  godraysPass.renderToScreen = true;
+  composer.addPass(godraysPass);
+
+  setupGUI();
+
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    const time = clock.getElapsedTime();
+
+    if (params.animateLight) {
+      light.position.x = params.lightX + Math.sin(time * params.animationSpeedX) * params.animationX;
+      light.position.y = params.lightY + Math.cos(time * params.animationSpeedY) * params.animationY;
+    }
+
+    source.position.copy(light.position);
+    halo.position.copy(light.position);
+
+    if (params.pulseSource) {
+      const pulse = 1 + Math.sin(time * params.pulseSpeed) * params.pulseAmount;
+      source.scale.setScalar((params.sourceSize / 55) * pulse);
+      halo.scale.setScalar((params.haloSize / 110) * pulse);
+    }
+
+    composer.render();
+  }
+
+  animate();
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
