@@ -30,6 +30,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { EffectComposer, RenderPass } from 'postprocessing';
 import { GodraysPass } from 'three-good-godrays';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import GUI from 'lil-gui';
 
 const scene = new THREE.Scene();
@@ -37,6 +38,18 @@ scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
 camera.position.set(0, 0, 1000);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableZoom = false;
+controls.enablePan = false;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minAzimuthAngle = -THREE.MathUtils.degToRad(30);
+controls.maxAzimuthAngle = THREE.MathUtils.degToRad(30);
+controls.minPolarAngle = Math.PI / 2 - THREE.MathUtils.degToRad(30);
+controls.maxPolarAngle = Math.PI / 2 + THREE.MathUtils.degToRad(30);
+controls.target.set(0, 0, 0);
+controls.update();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
