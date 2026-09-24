@@ -22,6 +22,7 @@
       import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
       import { TTFLoader } from 'three/addons/loaders/TTFLoader.js';
+      import { FontLoader } from 'three/addons/loaders/FontLoader.js';
       import { Font } from 'three/addons/loaders/FontLoader.js';
       import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
       import { EffectComposer, RenderPass } from 'postprocessing';
@@ -88,42 +89,41 @@
 
         composer.addPass(godraysPass);
 
-        const loader = new TTFLoader();
+        const fontLoader = new FontLoader();
 
-        loader.load('Montserrat-Bold.ttf', (json) => {
-          const font = new Font(json);
+        fontLoader.load('Montserrat-Bold.json', (font) => {
 
           const geometry = new TextGeometry('ЦЕНТРСВЕТ', {
-              font,
-              size: 100,
-              depth: 20,
-              curveSegments: 12,
-              bevelEnabled: true,
-              bevelThickness: 3,
-              bevelSize: 2,
-              bevelSegments: 4
+            font,
+            size: 100,
+            depth: 20,
+            curveSegments: 12,
+            bevelEnabled: true,
+            bevelThickness: 3,
+            bevelSize: 2,
+            bevelSegments: 4
           });
 
           geometry.center();
 
           const material = new THREE.MeshStandardMaterial({
-              color: 0xffccaa,
-              emissive: 0xff4422,
-              emissiveIntensity: 2
+            color: 0xffccaa,
+            emissive: 0xff4422,
+            emissiveIntensity: 2
           });
 
           const text = new THREE.Mesh(geometry, material);
+
           text.position.set(0, 100, -500);
 
           scene.add(text);
-        });
 
-        function animate() {
-          requestAnimationFrame(animate);
-          composer.render();
-        }
+          function animate() {
+            requestAnimationFrame(animate);
+            composer.render();
+          }
+        })
       }
-
       init();
     </script>
 
