@@ -56,7 +56,7 @@ scene.add(light);
 
 const source = new THREE.Mesh(
   new THREE.SphereGeometry(55, 64, 64),
-  new THREE.MeshBasicMaterial({ color: 0xffd0a0 })
+  new THREE.MeshBasicMaterial({ color: 0x000000 })
 );
 source.position.copy(light.position);
 scene.add(source);
@@ -131,9 +131,9 @@ function rebuildText() {
   geometry.center();
 
   const material = new THREE.MeshStandardMaterial({
-    color: 0xffc7a0,
-    emissive: 0x401508,
-    emissiveIntensity: 1.8,
+    color: 0x000000,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
     roughness: 0.28,
     metalness: 0.15
   });
