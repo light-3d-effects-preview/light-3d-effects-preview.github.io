@@ -167,17 +167,28 @@ function updateSource() {
 }
 
 function updateGodrays() {
-  if (!godraysPass) return;
+  if (!composer || !godraysPass) return;
 
-  godraysPass.density = params.density;
-  godraysPass.maxDensity = params.maxDensity;
-  godraysPass.edgeStrength = params.edgeStrength;
-  godraysPass.edgeRadius = params.edgeRadius;
-  godraysPass.distanceAttenuation = params.distanceAttenuation;
-  godraysPass.raymarchSteps = params.raymarchSteps;
-  godraysPass.blur = params.blur;
-  godraysPass.gammaCorrection = params.gammaCorrection;
-  godraysPass.color.set(params.lightColor);
+  const index = composer.passes.indexOf(godraysPass);
+
+  if (index !== -1) composer.passes.splice(index, 1);
+
+  godraysPass.dispose();
+
+  godraysPass = new GodraysPass(light, camera, {
+    density: params.density,
+    maxDensity: params.maxDensity,
+    edgeStrength: params.edgeStrength,
+    edgeRadius: params.edgeRadius,
+    distanceAttenuation: params.distanceAttenuation,
+    color: new THREE.Color(params.lightColor),
+    raymarchSteps: params.raymarchSteps,
+    blur: params.blur,
+    gammaCorrection: params.gammaCorrection
+  });
+
+  godraysPass.renderToScreen = true;
+  composer.addPass(godraysPass);
 }
 
 function setupGUI() {
@@ -207,14 +218,14 @@ function setupGUI() {
   sourceFolder.add(params, 'haloVisible').onChange(updateSource);
 
   const raysFolder = gui.addFolder('God Rays');
-  raysFolder.add(params, 'density', 0, 0.05, 0.0001).onChange(updateGodrays);
-  raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onChange(updateGodrays);
-  raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onChange(updateGodrays);
-  raysFolder.add(params, 'edgeRadius', 0, 10, 0.1).onChange(updateGodrays);
-  raysFolder.add(params, 'distanceAttenuation', 0, 10, 0.1).onChange(updateGodrays);
-  raysFolder.add(params, 'raymarchSteps', 10, 300, 1).onChange(updateGodrays);
-  raysFolder.add(params, 'blur').onChange(updateGodrays);
-  raysFolder.add(params, 'gammaCorrection').onChange(updateGodrays);
+  raysFolder.add(params, 'density', 0, 0.05, 0.0001).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'maxDensity', 0, 2, 0.01).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'edgeStrength', 0, 10, 0.1).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'edgeRadius', 0, 10, 0.1).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'distanceAttenuation', 0, 10, 0.1).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'raymarchSteps', 10, 300, 1).onFinishChange(updateGodrays);
+  raysFolder.add(params, 'blur').onFinishChange(updateGodrays);
+  raysFolder.add(params, 'gammaCorrection').onFinishChange(updateGodrays);
 
   gui.close();
 }
