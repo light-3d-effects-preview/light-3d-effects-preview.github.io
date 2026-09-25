@@ -88,36 +88,63 @@ controls.maxPolarAngle =
 controls.target.set(0, 0, 0);
 controls.update();
 
-const params = {
-  textSize: 150,
-  textDepth: 35,
+// const params = {
+//   textSize: 150,
+//   textDepth: 35,
 
-  lightColor: '#ffb27a',
-  lightIntensity: 120000,
-  lightDistance: 4000,
+//   lightColor: '#ffb27a',
+//   lightIntensity: 120000,
+//   lightDistance: 4000,
+//   lightX: 0,
+//   lightY: 0,
+//   lightZ: -500,
+
+//   tubeRadius: 90,
+//   tubeLength: 180,
+//   tubeVisible: false,
+
+//   shadowMapSize: 2048,
+//   shadowBias: -0.0005,
+
+//   density: 1 / 90,
+//   maxDensity: 0.75,
+//   edgeStrength: 3,
+//   edgeRadius: 2,
+//   distanceAttenuation: 1.5,
+//   raymarchSteps: 60,
+//   blur: true,
+//   gammaCorrection: true,
+
+//   topLightColor: '#ffffff',
+//   topLightIntensity: 150000,
+//   topLightDistance: 3000
+// };
+
+const params = {
+  textSize: 98,
+  textDepth: 9,
+  lightColor: '#ffffff',
+  lightIntensity: 200000,
+  lightDistance: 10000,
   lightX: 0,
   lightY: 0,
-  lightZ: -500,
-
-  tubeRadius: 90,
-  tubeLength: 180,
-  tubeVisible: false,
-
+  lightZ: -790,
+  tubeRadius: 300,
+  tubeLength: 500,
+  tubeVisible: true,
   shadowMapSize: 2048,
-  shadowBias: -0.0005,
-
-  density: 1 / 90,
-  maxDensity: 0.75,
-  edgeStrength: 3,
-  edgeRadius: 2,
-  distanceAttenuation: 1.5,
-  raymarchSteps: 60,
-  blur: true,
+  shadowBias: -0.01,
+  density: 0.005,
+  maxDensity: 2,
+  edgeStrength: 10,
+  edgeRadius: 10,
+  distanceAttenuation: 10,
+  raymarchSteps: 80,
+  blur: false,
   gammaCorrection: true,
-
   topLightColor: '#ffffff',
-  topLightIntensity: 150000,
-  topLightDistance: 3000
+  topLightIntensity: 0,
+  topLightDistance: 100
 };
 
 const light = new THREE.PointLight(
@@ -530,3 +557,4 @@ addEventListener('resize', () => {
 </script>
 </body>
 </html>
+
