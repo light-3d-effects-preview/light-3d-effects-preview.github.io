@@ -372,6 +372,9 @@ function switchCamera() {
 function setupGUI() {
   const gui = new GUI({ title: 'God Rays' });
 
+  gui.add({ copySettings }, 'copySettings').name('Copy Settings JSON');
+  gui.add({ switchCamera }, 'switchCamera').name('Switch Camera');
+
   gui.add({ switchCamera }, 'switchCamera').name('Switch Camera');
 
   const textFolder = gui.addFolder('Text');
@@ -510,6 +513,10 @@ new FontLoader().load('./Montserrat.typeface.json', font => {
 
   animate();
 });
+
+function copySettings() {
+  navigator.clipboard.writeText(JSON.stringify(params, null, 2));
+}
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
